@@ -177,10 +177,3 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
 # end_time = time.time()
 
 # print("DONE, Time elapsed = " + str(end_time-start_time) + "seconds.")
-#
-# # OP DEZE MANIER: 3:53 min
-
-
-# Experiment
-# - Using no threading for the request, but for the processing of the received data (check & update database): 306 seconds
-# - Using threading for the requests and no for processing: 332 sec - 176sec
