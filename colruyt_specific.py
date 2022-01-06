@@ -3,41 +3,15 @@ import json
 import time
 import database
 import concurrent.futures
-from lxml.html import fromstring
-from itertools import cycle
+import logging
 import random
+from proxy_requests import *
+
 
 API_URL = "https://ecgproductmw.colruyt.be/ecgproductmw/v2/nl/products/"
 WINKEL = "Colruyt"
 MAX_THREADS = 5
-SLEEP_TIME = 20
-
-PROXIES = []
-PROXY_POOL = None
-MIN_NB_PROXIES = 10
-
-"""
-    Function that returns a list of proxys
-"""
-def get_proxies():
-    url = 'https://free-proxy-list.net/'
-    try:
-        response = requests.get(url)
-        parser = fromstring(response.text)
-    except Exception as e:
-        database.log("error", "Error getting proxies:" + str(e), WINKEL)
-        return set()
-
-    proxies = set()
-    for i in parser.xpath('//tbody/tr'):
-        if i.xpath('.//td[7][contains(text(),"yes")]'):
-            proxy = ":".join([i.xpath('.//td[1]/text()')[0], i.xpath('.//td[2]/text()')[0]])
-            proxies.add(proxy)
-    
-    global PROXIES
-    PROXIES = proxies
-    global PROXY_POOL
-    PROXY_POOL = cycle(PROXIES)
+SLEEP_TIME = 5
 
 """
     Colruyt's categories are stored in the way displayed below.
@@ -74,10 +48,8 @@ def getCategoryTxt(cat):
     Returns the response. <=> None if there is an error.
 """
 def getProducts(page, amount, placeId=604):
-    # time.sleep(int(random.random()*SLEEP_TIME)) #TODO, its in order to limit the send rate. 
-    if len(PROXIES) < MIN_NB_PROXIES:
-        get_proxies()
-        database.log("info", "New proxies: #" + str(len(PROXIES)), WINKEL)
+    time.sleep(int(random.random()*SLEEP_TIME)) #TODO, its in order to limit the send rate. 
+
 
     params = {
         "clientCode": "clp",
@@ -88,24 +60,19 @@ def getProducts(page, amount, placeId=604):
         "sort": "popularity asc",
         "ts": time.time()
     }
-    global PROXY_POOL
-    proxy = next(PROXY_POOL)
-    try:
-        res = requests.get(API_URL, params=params, proxies={"http": str(proxy), "https": str(proxy)}, timeout=(60,120))
-        
-        #  res = requests.get(API_URL, params=params)
+    try:        
+        # res = requests.get(API_URL, params=params)
+        res = ProxyRequests(API_URL)
+        res.get(params)
 
     except (requests.exceptions.ProxyError, requests.exceptions.ConnectTimeout, requests.exceptions.SSLError) as err:
         database.log("error", "Error using proxies: " + str(err), WINKEL)
-        if proxy in PROXIES:
-            PROXIES.remove(proxy)
-            PROXY_POOL = cycle(PROXIES)
-            return getProducts(page, amount, placeId)
+
     except Exception as e:
         database.log("error", "Request error : " + str(e), WINKEL)
         print(str(e))
         return None
-    return res.text
+    return str(res)
 
 """
     Convert text into JSON. 
@@ -159,21 +126,26 @@ def test(page):
     print("Process page " + str(page))
     response = getProducts(page, 250)
     response_json = responseToJson(response)
+    if response_json is not None and response_json.get("productsReturned") is not None and response_json.get("productsReturned") == 0:
+        database.log("error", "No products returned. " + str(response[0:500]), WINKEL)
+        return None
+        
     processProducts(response_json)
     print(">>> process page " + str(page) + " done.")
 
-
-# start_time = time.time()
 pages = range(1,1000)
-get_proxies()
-# for page in pages:
-#     test(page)
+
+
 
 
 threads = MAX_THREADS
 with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
     executor.map(test, pages)
 
-# end_time = time.time()
 
-# print("DONE, Time elapsed = " + str(end_time-start_time) + "seconds.")
+
+
+# Experiment
+# - Using no threading for the request, but for the processing of the received data (check & update database): 306 seconds
+# - Using threading for the requests and no for processing: 332 sec - 176sec
+
