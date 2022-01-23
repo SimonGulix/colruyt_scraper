@@ -1,7 +1,7 @@
 import requests
 import json
 import time
-import database
+#import database
 import concurrent.futures
 import logging
 import random
@@ -66,10 +66,11 @@ def getProducts(page, amount, placeId=604):
         res.get(params)
 
     except (requests.exceptions.ProxyError, requests.exceptions.ConnectTimeout, requests.exceptions.SSLError) as err:
-        database.log("error", "Error using proxies: " + str(err), WINKEL)
+        #database.log("error", "Error using proxies: " + str(err), WINKEL)
+        pass
 
     except Exception as e:
-        database.log("error", "Request error : " + str(e), WINKEL)
+        #database.log("error", "Request error : " + str(e), WINKEL)
         print(str(e))
         return None
     return str(res)
@@ -84,7 +85,7 @@ def responseToJson(resp):
         result = json.loads(resp)
     except Exception as e:
         print("responseToJson: " + str(e))
-        database.log("error", "ResponseToJSON ERROR: " + str(e) + "\n ---- RESPONSE WAS:" + str(resp), WINKEL)
+        #database.log("error", "ResponseToJSON ERROR: " + str(e) + "\n ---- RESPONSE WAS:" + str(resp), WINKEL)
         return None
     return result
 
@@ -107,42 +108,50 @@ def processProduct(product):
         categories = getCategoryTxt(categories)
     else:
         categories = product.get("topCategoryName")
-    database.processProduct("Colruyt", 
-    product.get("productId"),
-    product.get("name"),
-    product.get("description"),
-    product.get("brand"),
-    product.get("thumbNail"),
-    product.get("content"),
-    price.get("basicPrice"),
-    price.get("quantityPrice"),
-    price.get("quantityPriceQuantity"),
-    price.get("measurementUnitPrice"),
-    price.get("measurementUnitQuantityPrice"),
-    price.get("measurementUnit"),
-    categories)
+    #database.processProduct("Colruyt",
+    #product.get("productId"),
+    #product.get("name"),
+    #product.get("description"),
+    #product.get("brand"),
+    #product.get("thumbNail"),
+    #product.get("content"),
+    #price.get("basicPrice"),
+    #price.get("quantityPrice"),
+    #price.get("quantityPriceQuantity"),
+    #price.get("measurementUnitPrice"),
+    #price.get("measurementUnitQuantityPrice"),
+    #price.get("measurementUnit"),
+    #categories)
 
 def test(page):
     print("Process page " + str(page))
     response = getProducts(page, 250)
     response_json = responseToJson(response)
     if response_json is not None and response_json.get("productsReturned") is not None and response_json.get("productsReturned") == 0:
-        database.log("error", "No products returned. " + str(response[0:500]), WINKEL)
+        #database.log("error", "No products returned. " + str(response[0:500]), WINKEL)
         return None
         
     processProducts(response_json)
     print(">>> process page " + str(page) + " done.")
 
+# start_time = time.time()
 pages = range(1,1000)
 
 
+
+# for page in pages:
+#     test(page)
 
 
 threads = MAX_THREADS
 with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
     executor.map(test, pages)
 
+# end_time = time.time()
 
+# print("DONE, Time elapsed = " + str(end_time-start_time) + "seconds.")
+#
+# # OP DEZE MANIER: 3:53 min
 
 
 # Experiment
